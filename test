@@ -1,0 +1,63 @@
+import routeros_api
+import getpass
+
+HOST = '10.222.7.1'
+USERNAME = 'admin'
+
+def connect(password):
+    pool = routeros_api.RouterOsApiPool(HOST, username=USERNAME, password=password, plaintext_login=True)
+    return pool.get_api()
+
+def get_identity(api):
+    identity = api.get_resource('/system/identity')
+    print("\n  Router Name: " + identity.get()[0]['name'])
+
+def get_ip_addresses(api):
+    addresses = api.get_resource('/ip/address')
+    print('\n  Configured IP Addresses:')
+    for addr in addresses.get():
+        print("    " + addr['address'] + " -> " + addr['interface'])
+
+def get_interfaces(api):
+    ifaces = api.get_resource('/interface')
+    print('\n  Interfaces:')
+    for i in ifaces.get():
+        status = 'UP' if i.get('running') == 'true' else 'DOWN'
+        print("    " + i['name'] + " " + status)
+
+def get_routes(api):
+    routes = api.get_resource('/ip/route')
+    print('\n  Routing Table:')
+    for r in routes.get():
+        print("    " + r.get('dst-address','n/a') + " via " + r.get('gateway','n/a'))
+
+def change_password(api, old_pw, new_pw):
+    try:
+        api.get_resource('/user').call('set-password', {'old-password': old_pw, 'new-password': new_pw})
+        print('  Password changed successfully.')
+    except Exception as e:
+        print('  Error: ' + str(e))
+
+def main():
+    pw = getpass.getpass('R1 Password: ')
+    try:
+        api = connect(pw)
+    except Exception as e:
+        print('Could not connect: ' + str(e))
+        return
+    print('\n========== MikroTik R1 Manager ==========')
+    get_identity(api)
+    get_ip_addresses(api)
+    get_interfaces(api)
+    get_routes(api)
+    print('\n--- Change Password ---')
+    old = getpass.getpass('Current password: ')
+    new = getpass.getpass('New password: ')
+    confirm = getpass.getpass('Confirm new password: ')
+    if new == confirm:
+        change_password(api, old, new)
+    else:
+        print('  Passwords do not match.')
+
+if __name__ == '__main__':
+    main()
